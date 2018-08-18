@@ -49,6 +49,7 @@ static char * opt_input = NULL, * opt_output = NULL;
 static char * opt_bind_to_aid = NULL;
 static char * opt_sig_format = NULL;
 static int opt_crypt_flags = 0;
+static int opt_use_pinpad = 0;
 
 enum {
 	OPT_SHA1 =	0x100,
@@ -60,6 +61,7 @@ enum {
 	OPT_PKCS1,
 	OPT_BIND_TO_AID,
 	OPT_VERSION,
+	OPT_USE_PINPAD,					// 0x10006 in pkcs15-init.c
 };
 
 static const struct option options[] = {
@@ -83,6 +85,7 @@ static const struct option options[] = {
 	{ "aid",		1, NULL,		OPT_BIND_TO_AID },
 	{ "wait",		0, NULL,		'w' },
 	{ "verbose",		0, NULL,		'v' },
+	{ "use-pinpad",		0, NULL,		OPT_USE_PINPAD },
 	{ NULL, 0, NULL, 0 }
 };
 
@@ -107,6 +110,7 @@ static const char *option_help[] = {
 	"Specify AID of the on-card PKCS#15 application to be binded to (in hexadecimal form)",
 	"Wait for card insertion",
 	"Verbose operation. Use several times to enable debug output.",
+	"Do not prompt the user; if no PINs supplied, pinpad will be used.",
 };
 
 static sc_context_t *ctx = NULL;
@@ -133,6 +137,13 @@ static char * get_pin(struct sc_pkcs15_object *obj)
 	char buf[(sizeof obj->label) + 20];
 	char *pincode;
 	struct sc_pkcs15_auth_info *pinfo = (struct sc_pkcs15_auth_info *) obj->data;
+
+	if (opt_use_pinpad) {	    // defer entry of the PIN to the reader's pinpad
+		if (verbose)
+		    snprintf(buf, sizeof(buf), "Enter PIN [%.*s]: entry deferred to the reader's keypad\n", 
+			     (int) sizeof obj->label, obj->label);
+		return NULL;
+	}
 
 	if (pinfo->auth_type != SC_PKCS15_PIN_AUTH_TYPE_PIN)
 		return NULL;
@@ -434,6 +445,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'w':
 			opt_wait = 1;
+			break;
+		case OPT_USE_PINPAD:
+			opt_use_pinpad = 1;
 			break;
 		}
 	}
